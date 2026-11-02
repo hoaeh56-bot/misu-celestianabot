@@ -43,10 +43,11 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
         await message.reply(
             "💖 <b>Меню отношений</b>\n"
             "Выбери действие или напиши команду:\n"
-            "• `.отн пара` (ответом на сообщение) — создать пару\n"
-            "• `.отн запрос` (ответом на сообщение) — предложить секс\n"
-            "• `.отн я` — посмотреть профиль",
-            reply_markup=menu_kb
+            "• <code>.отн пара</code> (ответом на сообщение) — создать пару\n"
+            "• <code>.отн запрос</code> (ответом на сообщение) — предложить секс\n"
+            "• <code>.отн я</code> — посмотреть профиль",
+            reply_markup=menu_kb,
+            parse_mode="HTML"
         )
         return
 
@@ -91,7 +92,8 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
             f"💖 <b>{target_name}</b>, минутку внимания!\n"
             f"<b>{initiator_name}</b> предлагает тебе начать отношения.\n"
             f"У тебя есть 2 минуты, чтобы ответить.",
-            reply_markup=kb
+            reply_markup=kb,
+            parse_mode="HTML"
         )
 
     # --- .отн запрос (СЕКС) ---
@@ -109,7 +111,8 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
             f"🔥 <b>{target_name}</b>, есть предложение!\n"
             f"<b>{initiator_name}</b> хочет заняться с тобой сексом.\n"
             f"Ответишь?",
-            reply_markup=kb
+            reply_markup=kb,
+            parse_mode="HTML"
         )
 
     # --- .отн я (ПРОФИЛЬ) ---
@@ -159,7 +162,7 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
              InlineKeyboardButton(text="📜 История", callback_data="menu_history")]
         ])
         
-        await message.reply(profile_text, reply_markup=kb, disable_web_page_preview=True)
+        await message.reply(profile_text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
 # --- ОБРАБОТКА КНОПОК ---
 @router.callback_query(F.data.startswith("accept_rel_"))
@@ -176,7 +179,8 @@ async def process_accept_rel(callback: CallbackQuery, db: asyncpg.Pool):
     await callback.message.edit_text(
         f"💖 Отношения заключены!\n"
         f"Пара получает <b>100 искр</b>.\n"
-        f"Напишите `.отн я`, чтобы посмотреть профиль."
+        f"Напишите <code>.отн я</code>, чтобы посмотреть профиль.",
+        parse_mode="HTML"
     )
     await callback.answer("Отношения созданы!")
 
@@ -189,7 +193,8 @@ async def process_decline_rel(callback: CallbackQuery):
 async def process_accept_sex(callback: CallbackQuery, db: asyncpg.Pool):
     await callback.message.edit_text(
         f"🔥 Вы занялись сексом!\n"
-        f"<i>(Пока это просто текст, потом добавим генерацию картинок или начисление искр)</i>"
+        f"<i>(Пока это просто текст, потом добавим генерацию картинок или начисление искр)</i>",
+        parse_mode="HTML"
     )
     await callback.answer("Успехов! 🔥")
 

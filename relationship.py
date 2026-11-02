@@ -33,18 +33,16 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
     text = message.text.lower().strip()
     args = text.split()
     
-    # Если написали просто .отн - показываем меню
+    # Если написали просто .отн - показываем меню (БЕЗ КНОПКИ ОБНЯТЬ)
     if len(args) == 1:
         menu_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="❤️ Предложить отношения", callback_data="show_create_info")],
-            [InlineKeyboardButton(text="🤗 Обнять", callback_data="show_hug_info")],
+            [InlineKeyboardButton(text="❤️ Создать отношения", callback_data="show_create_info")],
             [InlineKeyboardButton(text="👤 Мой профиль", callback_data="show_profile_info")]
         ])
         await message.reply(
             "💖 <b>Меню отношений</b>\n"
             "Выбери действие или напиши команду:\n"
             "• <code>.отн запрос</code> (ответом на сообщение) — предложить отношения\n"
-            "• <code>.отн обнять</code> (ответом на сообщение) — обнять человека\n"
             "• <code>.отн я</code> — посмотреть профиль",
             reply_markup=menu_kb,
             parse_mode="HTML"
@@ -53,24 +51,26 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
 
     action = args[1]
 
-    # Проверка реплая для действий
-    if action in ["запрос", "обнять"]:
-        if not message.reply_to_message:
-            await message.reply("💔 Ответь (Reply) на сообщение человека.")
-            return
-        
-        if message.reply_to_message.from_user.is_bot:
-            await message.reply("🤖 Нельзя сделать это с ботом.")
-            return
-
     # --- .отн запрос (ПРЕДЛОЖЕНИЕ ОТНОШЕНИЙ) ---
     if action == "запрос":
+        if not message.reply_to_message:
+            await message.reply("💔 Ответь (Reply) на сообщение человека, с которым хочешь начать отношения.")
+            return
+        
+        # Проверяем, что это не сообщение от самого бота
+        if message.reply_to_message.from_user.id == (await message.bot.me()).id:
+            await message.reply("🤖 Ответь на сообщение реального человека, а не бота.")
+            return
+
         target_id = message.reply_to_message.from_user.id
         target_name = message.reply_to_message.from_user.first_name
         initiator_id = message.from_user.id
         initiator_name = message.from_user.first_name
 
-        # Проверка, нет ли уже пары
+        if target_id == initiator_id:
+            await message.reply("🤨 Нельзя вступить в отношения с самим собой.")
+            return
+
         existing = await db.fetchrow(
             "SELECT * FROM couples WHERE chat_id = $1 AND status = 'ACTIVE' AND (user1_id = $2 OR user2_id = $2 OR user1_id = $3 OR user2_id = $3)",
             message.chat.id, initiator_id, target_id
@@ -90,16 +90,6 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
             f"<b>{initiator_name}</b> предлагает тебе начать отношения.\n"
             f"У тебя есть 2 минуты, чтобы ответить.",
             reply_markup=kb,
-            parse_mode="HTML"
-        )
-
-    # --- .отн обнять ---
-    elif action == "обнять":
-        target_name = message.reply_to_message.from_user.first_name
-        initiator_name = message.from_user.first_name
-        
-        await message.reply(
-            f"🤗 <b>{initiator_name}</b> крепко обнял(а) <b>{target_name}</b>!",
             parse_mode="HTML"
         )
 
@@ -178,6 +168,6 @@ async def process_decline_rel(callback: CallbackQuery):
     await callback.answer()
 
 # --- ЗАГЛУШКИ ДЛЯ КНОПОК ПРОФИЛЯ ---
-@router.callback_query(F.data.in_({"buy_sparks", "buy_premium", "menu_children", "menu_pregnancy", "menu_house", "menu_pets", "menu_gifts", "menu_history", "show_create_info", "show_hug_info", "show_profile_info"}))
+@router.callback_query(F.data.in_({"buy_sparks", "buy_premium", "menu_children", "menu_pregnancy", "menu_house", "menu_pets", "menu_gifts", "menu_history", "show_create_info", "show_profile_info"}))
 async def profile_menus(callback: CallbackQuery):
     await callback.answer("Этот раздел находится в разработке.", show_alert=True)

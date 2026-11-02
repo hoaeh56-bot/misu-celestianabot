@@ -36,15 +36,15 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
     # Если написали просто .отн - показываем меню
     if len(args) == 1:
         menu_kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="❤️ Создать пару", callback_data="show_create_info")],
-            [InlineKeyboardButton(text="🔥 Предложить секс", callback_data="show_sex_info")],
+            [InlineKeyboardButton(text="❤️ Предложить отношения", callback_data="show_create_info")],
+            [InlineKeyboardButton(text="🤗 Обнять", callback_data="show_hug_info")],
             [InlineKeyboardButton(text="👤 Мой профиль", callback_data="show_profile_info")]
         ])
         await message.reply(
             "💖 <b>Меню отношений</b>\n"
             "Выбери действие или напиши команду:\n"
-            "• <code>.отн пара</code> (ответом на сообщение) — создать пару\n"
-            "• <code>.отн запрос</code> (ответом на сообщение) — предложить секс\n"
+            "• <code>.отн запрос</code> (ответом на сообщение) — предложить отношения\n"
+            "• <code>.отн обнять</code> (ответом на сообщение) — обнять человека\n"
             "• <code>.отн я</code> — посмотреть профиль",
             reply_markup=menu_kb,
             parse_mode="HTML"
@@ -53,27 +53,24 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
 
     action = args[1]
 
-    # Проверка реплая для команд пара/запрос
-    if action in ["пара", "создать", "запрос"]:
+    # Проверка реплая для действий
+    if action in ["запрос", "обнять"]:
         if not message.reply_to_message:
             await message.reply("💔 Ответь (Reply) на сообщение человека.")
             return
         
-        if message.reply_to_message.from_user.id == message.from_user.id:
-            await message.reply("🤨 Нельзя сделать это с самим собой.")
-            return
-            
         if message.reply_to_message.from_user.is_bot:
             await message.reply("🤖 Нельзя сделать это с ботом.")
             return
 
-    # --- .отн пара ---
-    if action in ["пара", "создать"]:
+    # --- .отн запрос (ПРЕДЛОЖЕНИЕ ОТНОШЕНИЙ) ---
+    if action == "запрос":
         target_id = message.reply_to_message.from_user.id
         target_name = message.reply_to_message.from_user.first_name
         initiator_id = message.from_user.id
         initiator_name = message.from_user.first_name
 
+        # Проверка, нет ли уже пары
         existing = await db.fetchrow(
             "SELECT * FROM couples WHERE chat_id = $1 AND status = 'ACTIVE' AND (user1_id = $2 OR user2_id = $2 OR user1_id = $3 OR user2_id = $3)",
             message.chat.id, initiator_id, target_id
@@ -96,22 +93,13 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
             parse_mode="HTML"
         )
 
-    # --- .отн запрос (СЕКС) ---
-    elif action == "запрос":
-        target_id = message.reply_to_message.from_user.id
+    # --- .отн обнять ---
+    elif action == "обнять":
         target_name = message.reply_to_message.from_user.first_name
         initiator_name = message.from_user.first_name
-
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔥 Да", callback_data=f"accept_sex_{message.from_user.id}_{target_id}"),
-             InlineKeyboardButton(text="❌ Нет", callback_data="decline_sex")]
-        ])
         
         await message.reply(
-            f"🔥 <b>{target_name}</b>, есть предложение!\n"
-            f"<b>{initiator_name}</b> хочет заняться с тобой сексом.\n"
-            f"Ответишь?",
-            reply_markup=kb,
+            f"🤗 <b>{initiator_name}</b> крепко обнял(а) <b>{target_name}</b>!",
             parse_mode="HTML"
         )
 
@@ -123,7 +111,7 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
         )
         
         if not couple:
-            await message.reply("❌ У тебя пока нет пары в этом чате. Используй `.отн пара`.")
+            await message.reply("❌ У тебя пока нет пары в этом чате. Используй `.отн запрос`.")
             return
 
         partner_id = couple['user2_id'] if couple['user1_id'] == message.from_user.id else couple['user1_id']
@@ -164,7 +152,7 @@ async def relationship_handler(message: Message, db: asyncpg.Pool):
         
         await message.reply(profile_text, reply_markup=kb, parse_mode="HTML", disable_web_page_preview=True)
 
-# --- ОБРАБОТКА КНОПОК ---
+# --- ОБРАБОТКА КНОПОК ОТНОШЕНИЙ ---
 @router.callback_query(F.data.startswith("accept_rel_"))
 async def process_accept_rel(callback: CallbackQuery, db: asyncpg.Pool):
     data = callback.data.split("_")
@@ -189,20 +177,7 @@ async def process_decline_rel(callback: CallbackQuery):
     await callback.message.edit_text("💔 Предложение отношений отклонено.")
     await callback.answer()
 
-@router.callback_query(F.data.startswith("accept_sex_"))
-async def process_accept_sex(callback: CallbackQuery, db: asyncpg.Pool):
-    await callback.message.edit_text(
-        f"🔥 Вы занялись сексом!\n"
-        f"<i>(Пока это просто текст, потом добавим генерацию картинок или начисление искр)</i>",
-        parse_mode="HTML"
-    )
-    await callback.answer("Успехов! 🔥")
-
-@router.callback_query(F.data == "decline_sex")
-async def process_decline_sex(callback: CallbackQuery):
-    await callback.message.edit_text("❌ В сексе отказано. Не судьба.")
-    await callback.answer()
-
-@router.callback_query(F.data.in_({"buy_sparks", "buy_premium", "menu_children", "menu_pregnancy", "menu_house", "menu_pets", "menu_gifts", "menu_history", "show_create_info", "show_sex_info", "show_profile_info"}))
+# --- ЗАГЛУШКИ ДЛЯ КНОПОК ПРОФИЛЯ ---
+@router.callback_query(F.data.in_({"buy_sparks", "buy_premium", "menu_children", "menu_pregnancy", "menu_house", "menu_pets", "menu_gifts", "menu_history", "show_create_info", "show_hug_info", "show_profile_info"}))
 async def profile_menus(callback: CallbackQuery):
     await callback.answer("Этот раздел находится в разработке.", show_alert=True)
